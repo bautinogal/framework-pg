@@ -1,7 +1,7 @@
 import env from '../config/env.js';
 import knex from '../db.js';
-
-const { prefix: cdcPrefix, id: cdcId, action: cdcAction, createdAt: cdcCreatedAt } = env.tables.cdc;
+import { hash } from '../lib/crypto/index.js';
+const { prefix: cdcPrefix, id: cdcId, action: cdcAction, createdAt: cdcCreatedAt, ignore } = env.tables.cdc;
 
 async function getSchema() {
     const res = {};
@@ -75,7 +75,7 @@ async function createCDC() {
     }
 
     const tableNames = Object.keys(schema);
-    const noCDCTables = tableNames.filter(x => !x.startsWith(cdcPrefix) && !x.includes('knex') && !tableNames.find(y => y === `${cdcPrefix}${x}`))
+    const noCDCTables = tableNames.filter(x => !x.startsWith(cdcPrefix) && !ignore.includes(x) && !x.includes('knex') && !tableNames.find(y => y === `${cdcPrefix}${x}`))
 
     for (const tableName of noCDCTables) {
         const auditTableName = `${cdcPrefix}${tableName}`;
@@ -166,7 +166,95 @@ async function createNotifications() {
     }
 };
 
+async function createPermissions() {
+    let schema = await getSchema();
+    const tableNames = Object.keys(schema).filter(x => !x.includes('knex'));
+    const permissions = await knex('permissions').select('*');
+
+    let users = await knex('users').select('*');
+    // Create Admin user if not exists
+    if (!users.find(x => x.email === env.app.adminEmail)) {
+        const { email, pass, name, lastName } = env.users.admin;
+        await knex('users').insert({
+            email,
+            password: await hash(pass),
+            name,
+            lastName,
+            editorId: 1,
+            editionDate: Date.now(),
+        });
+    };
+
+    const adminUserId = (await knex('users').select('*')).find(x => x.email === env.app.adminEmail).id;
+
+    // Create permissions for each table
+    for (const tableName of tableNames) {
+        if (!tableName.startsWith(cdcPrefix) && !permissions.find(x => x.name === `read-${tableName}`)) {
+            await knex('permissions').insert({
+                name: `read-${tableName}`,
+                description: `Read from table: ${tableName}`,
+                generic: true
+            });
+        };
+        if (!tableName.startsWith(cdcPrefix) && !permissions.find(x => x.name === `write-${tableName}`)) {
+            await knex('permissions').insert({
+                name: `write-${tableName}`,
+                description: `Write, Edit and Delete from table: ${tableName}`,
+                generic: true
+            });
+        };
+        if (tableName.startsWith(cdcPrefix) && !permissions.find(x => x.name === `read-cdc-${tableName}`)) {
+            await knex('permissions').insert({
+                name: `read-cdc-${tableName}`,
+                description: `Read table history: ${tableName}`,
+                generic: true
+            });
+        };
+    };
+
+    const rols = await knex('rols').select('*');
+
+    // Create Admin role if not exists
+    if (!rols.find(x => x.name === 'Admin')) {
+        await knex('rols').insert({
+            name: 'Admin',
+            description: 'Allmighty super Admin!',
+            editorId: adminUserId,
+            editionDate: Date.now(),
+        });
+    };
+
+    const adminRolId = (await knex('rols').select('*')).find(x => x.name === 'Admin').id;
+
+    const rolsPermissionsMap = await knex('rolsPermissionsMap').select('*');
+
+    // Assign all permissions to Admin role
+    for (const permission of permissions) {
+        const permissionId = permission.id;
+        if (!rolsPermissionsMap.find(x => x.permissionId === permissionId && x.rolId === adminRolId)) {
+            await knex('rolsPermissionsMap').insert({
+                rolId: adminRolId,
+                permissionId,
+                editorId: adminUserId,
+                editionDate: Date.now()
+            });
+        }
+    };
+
+    const rolesUsersMap = await knex('rolsUsersMap').select('*');
+    // Assign Admin role to Admin user
+    if (!rolesUsersMap.find(x => x.userId === adminUserId && x.rolId === adminRolId)) {
+        await knex('rolsUsersMap').insert({
+            userId: adminUserId,
+            rolId: adminRolId,
+            editorId: adminUserId,
+            editionDate: Date.now()
+        });
+    };
+};
+
 await createCDC();
 await createNotifications();
+await createPermissions();
 
-console.log('Migration finished OK!')
+console.log('Migration finished OK!');

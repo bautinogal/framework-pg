@@ -5,14 +5,16 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "migrate": "npx knex migrate:latest && node ./scripts/createCDC.js",
+    "migrate": "npx knex migrate:latest && node ./scripts/afterMigration.js",
     "seed": "npx knex seed:run"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "bcryptjs": "^2.4.3",
     "csv-parser": "^3.0.0",
     "dotenv": "^16.4.1",
+    "jsonwebtoken": "^9.0.2",
     "knex": "^3.1.0",
     "lodash": "^4.17.21",
     "pg": "^8.11.3"

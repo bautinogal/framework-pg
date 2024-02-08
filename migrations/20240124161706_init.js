@@ -1,62 +1,104 @@
 export const up = function (knex) {
     return knex.schema
+        //#region basic tables
         .then(() => {
-            return knex.schema.createTable('personas', table => {
+            return knex.schema.createTable('users', table => {
                 table.increments('id').primary();
                 table.string('email').notNullable().unique();
-                table.string('password');
-                table.string('nombre');
-                table.string('apellido');
-                table.string('DNI');
-                table.integer('editorId').references('id').inTable('personas').notNullable().onDelete('CASCADE');
-                table.biginteger('fechaEdicion').notNullable();
+                table.string('password').notNullable();
+                table.string('name');
+                table.string('lastName');
+                table.integer('editorId').references('id').inTable('users').notNullable().onDelete('CASCADE');
+                table.biginteger('editionDate').notNullable();
             })
         })
         .then(() => {
-            return knex.schema.createTable('empresas', table => {
+            return knex.schema.createTable('permissions', table => {
                 table.increments('id').primary();
-                table.integer('nombre').notNullable();
-                table.integer('sector').notNullable();
-                table.integer('editorId').references('id').inTable('personas').notNullable().onDelete('CASCADE');
-                table.biginteger('fechaEdicion').notNullable();
+                table.string('name').notNullable().unique();
+                table.string('description');
+                table.boolean('generic').defaultTo(false);
             })
         })
         .then(() => {
-            return knex.schema.createTable('productos', table => {
+            return knex.schema.createTable('rols', table => {
                 table.increments('id').primary();
-                table.string('nombre').notNullable().unique();
-                table.string('descripcion');
-                table.integer('editorId').references('id').inTable('personas').notNullable().onDelete('CASCADE');
-                table.biginteger('fechaEdicion').notNullable();
+                table.string('name').notNullable();
+                table.string('description');
+                table.integer('editorId').references('id').inTable('users').notNullable().onDelete('CASCADE');
+                table.biginteger('editionDate').notNullable();
             })
         })
         .then(() => {
-            return knex.schema.createTable('compras', table => {
+            return knex.schema.createTable('rolsPermissionsMap', table => {
+                table.integer('permissionId').references('id').inTable('permissions').notNullable().onDelete('CASCADE');
+                table.integer('rolId').references('id').inTable('rols').notNullable().onDelete('CASCADE');
+                table.integer('editorId').references('id').inTable('users').notNullable().onDelete('CASCADE');
+                table.biginteger('editionDate').notNullable();
+                table.primary(['permissionId', 'rolId']);
+            })
+        })
+        .then(() => {
+            return knex.schema.createTable('rolsUsersMap', table => {
+                table.integer('userId').references('id').inTable('users').notNullable().onDelete('CASCADE');
+                table.integer('rolId').references('id').inTable('rols').notNullable().onDelete('CASCADE');
+                table.integer('editorId').references('id').inTable('users').notNullable().onDelete('CASCADE');
+                table.biginteger('editionDate').notNullable();
+                table.primary(['userId', 'rolId']);
+            })
+        })
+        //#endregion basic tables
+        //#region custom tables
+        .then(() => {
+            return knex.schema.createTable('companies', table => {
                 table.increments('id').primary();
-                table.integer('compradorId').references('id').inTable('personas').notNullable().onDelete('CASCADE');
-                table.integer('editorId').references('id').inTable('personas').notNullable().onDelete('CASCADE');
-                table.biginteger('fechaEdicion').notNullable();
+                table.string('name').notNullable();
+                table.string('sector').notNullable();
+                table.integer('editorId').references('id').inTable('users').notNullable().onDelete('CASCADE');
+                table.biginteger('editionDate').notNullable();
             })
         })
         .then(() => {
-            return knex.schema.createTable('productosComprasMap', table => {
-                table.integer('compraId').references('id').inTable('compras').notNullable().onDelete('CASCADE');
-                table.integer('productoId').references('id').inTable('productos').notNullable().onDelete('CASCADE');
-                table.integer('editorId').references('id').inTable('personas').notNullable().onDelete('CASCADE');
-                table.biginteger('fechaEdicion').notNullable();
-                table.primary(['compraId', 'productoId']);
+            return knex.schema.createTable('products', table => {
+                table.increments('id').primary();
+                table.string('name').notNullable().unique();
+                table.string('description');
+                table.integer('editorId').references('id').inTable('users').notNullable().onDelete('CASCADE');
+                table.biginteger('editionDate').notNullable();
             })
         })
+        .then(() => {
+            return knex.schema.createTable('purchases', table => {
+                table.increments('id').primary();
+                table.integer('userId').references('id').inTable('users').notNullable().onDelete('CASCADE');
+                table.integer('editorId').references('id').inTable('users').notNullable().onDelete('CASCADE');
+                table.biginteger('editionDate').notNullable();
+            })
+        })
+        .then(() => {
+            return knex.schema.createTable('productsPurchasesMap', table => {
+                table.integer('purchaseId').references('id').inTable('purchases').notNullable().onDelete('CASCADE');
+                table.integer('productId').references('id').inTable('products').notNullable().onDelete('CASCADE');
+                table.integer('editorId').references('id').inTable('users').notNullable().onDelete('CASCADE');
+                table.biginteger('editionDate').notNullable();
+                table.primary(['purchaseId', 'productId']);
+            })
+        })
+        //#endregion custom tables
 };
 
 export const down = function (knex) {
     knex.destroy();
     return knex.schema
-        .then(() => knex.schema.dropTableIfExists("personas"))
-        .then(() => knex.schema.dropTableIfExists("empresas"))
-        .then(() => knex.schema.dropTableIfExists("productos"))
-        .then(() => knex.schema.dropTableIfExists("compras"))
-        .then(() => knex.schema.dropTableIfExists("productosComprasMap"))
+        .then(() => knex.schema.dropTableIfExists("productspurchasesMap"))
+        .then(() => knex.schema.dropTableIfExists("purchases"))
+        .then(() => knex.schema.dropTableIfExists("products"))
+        .then(() => knex.schema.dropTableIfExists("companies"))
+        .then(() => knex.schema.dropTableIfExists("users"))
+        .then(() => knex.schema.dropTableIfExists("rolsUsersMap"))
+        .then(() => knex.schema.dropTableIfExists("rolsPermissionsMap"))
+        .then(() => knex.schema.dropTableIfExists("rols"))
+        .then(() => knex.schema.dropTableIfExists("permissions"))
 };
 
 export const config = { transaction: true };
